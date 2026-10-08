@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta
+      name="description"
+      content="Event Horizon — 支持 GPU 实时光线弯曲与可调参数的黑洞观测台。"
+    />
+    <title>Event Horizon · 黑洞观测台</title>
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="./" aria-label="Event Horizon 首页"
+        ><span class="brand-orbit" aria-hidden="true"></span
+        ><span>EVENT HORIZON<small>交互式黑洞观测台</small></span></a
+      >
+      <div class="header-middle">
+        <span class="header-divider"></span><span>OBSERVATORY / 01</span>
+      </div>
+      <div class="header-actions">
+        <span class="gpu-badge" id="gpu-badge"
+          ><i></i><span>初始化 GPU</span></span
+        ><button
+          class="button secondary"
+          id="export-image"
+          title="导出当前黑洞画面为 PNG"
+        >
+          <span data-icon="camera"></span>导出画面
+        </button>
+      </div>
+    </header>
+    <main class="workspace">
+      <section class="viewport" id="viewport" aria-label="实时黑洞可视化">
+        <canvas
+          id="universe"
+          aria-label="GPU 渲染的黑洞，可拖动旋转视角，滚轮缩放"
+          tabindex="0"
+        ></canvas>
+        <div class="viewport-title">
+          <div class="eyebrow">
+            <span class="live-dot"></span>实时光线追踪
+            <span class="slash">/</span> WEBGL 2.0
+          </div>
+          <h1>凝视<span>事件视界。</span></h1>
+          <p>在光与引力的边界，探索不可见之物。</p>
+        </div>
+        <div class="viewport-top-right">
+          <span id="scene-label">CINEMATIC VIEW</span
+          ><span class="crosshair-mark">+</span>
+        </div>
+        <div class="canvas-corner corner-tl"></div>
+        <div class="canvas-corner corner-tr"></div>
+        <div class="canvas-corner corner-bl"></div>
+        <div class="canvas-corner corner-br"></div>
+        <div class="error-state" id="error-state" hidden>
+          <span data-icon="alert"></span>
+          <h2>无法启动渲染器</h2>
+          <p id="error-message"></p>
+          <button class="button" id="retry">重新尝试</button>
+        </div>
+        <div class="viewport-bottom">
+          <div class="scene-caption">
+            <span class="caption-line"></span
+            ><span>吸积盘 · 引力透镜 · 相对论性增亮</span>
+          </div>
+          <div class="readouts">
+            <div>
+              <span>黑洞质量</span
+              ><strong id="mass-readout">4.30 <small>×10⁶ M☉</small></strong>
+            </div>
+            <div>
+              <span>史瓦西半径</span
+              ><strong id="radius-readout">12.70 <small>百万 km</small></strong>
+            </div>
+            <div>
+              <span>观测倾角</span
+              ><strong id="angle-readout">72 <small>deg</small></strong>
+            </div>
+          </div>
+          <div class="viewport-toolbar">
+            <div class="gesture-hint">
+              <span data-icon="mouse"></span
+              ><span>拖动旋转 <b>·</b> 滚轮缩放</span>
+            </div>
+            <div class="toolbar-buttons">
+              <button
+                class="icon-button"
+                id="pause"
+                aria-label="暂停动画"
+                title="暂停 / 继续（Space）"
+              >
+                <span data-icon="pause"></span></button
+              ><button
+                class="icon-button"
+                id="reset-camera"
+                aria-label="重置视角"
+                title="重置视角"
+              >
+                <span data-icon="orbit"></span></button
+              ><button
+                class="icon-button"
+                id="hide-panel"
+                aria-label="隐藏参数面板"
+                title="显示 / 隐藏参数面板（H）"
+              >
+                <span data-icon="panel"></span></button
+              ><button
+                class="icon-button"
+                id="fullscreen"
+                aria-label="全屏显示"
+                title="全屏（F）"
+              >
+                <span data-icon="fullscreen"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="frame-stats">
+          <span id="fps">— FPS</span><span class="dot-separator">·</span
+          ><span id="resolution">初始化</span>
+        </div>
+      </section>
+      <aside
+        class="control-panel"
+        id="control-panel"
+        aria-label="黑洞参数控制面板"
+      >
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">MISSION CONTROL</span>
+            <h2>观测参数</h2>
+          </div>
+          <button
+            class="icon-button"
+            id="reset-all"
+            title="恢复默认参数（R）"
+            aria-label="恢复默认参数"
+          >
+            <span data-icon="reset"></span>
+          </button>
+        </div>
+        <div class="panel-scroll">
+          <section class="parameter-section preset-section">
+            <div class="section-label">
+              <span>01</span>
+              <h3>场景预设</h3>
+            </div>
+            <div class="presets">
+              <button
+                class="preset active"
+                data-preset="cinematic"
+                aria-pressed="true"
+              >
+                <span class="preset-orbit edge"></span>电影感</button
+              ><button class="preset" data-preset="faceOn" aria-pressed="false">
+                <span class="preset-orbit top"></span>俯视</button
+              ><button class="preset" data-preset="blue" aria-pressed="false">
+                <span class="preset-orbit blue"></span>高温
+              </button>
+            </div>
+          </section>
+          <section class="parameter-section">
+            <div class="section-label">
+              <span>02</span>
+              <h3>黑洞与吸积盘</h3>
+            </div>
+            <div id="physics-controls"></div>
+          </section>
+          <section class="parameter-section">
+            <div class="section-label">
+              <span>03</span>
+              <h3>观测与渲染</h3>
+            </div>
+            <div id="render-controls"></div>
+            <div class="select-row">
+              <label for="quality">渲染质量</label
+              ><select id="quality">
+                <option value="performance">流畅 · 低负载</option>
+                <option value="balanced" selected>均衡 · 推荐</option>
+                <option value="ultra">精细 · 高负载</option>
+              </select>
+            </div>
+            <div class="toggle-list">
+              <label class="toggle-row"
+                ><span>引力透镜<small>光线受引力弯曲</small></span
+                ><input type="checkbox" id="lensing" checked /><span
+                  class="switch"
+                  aria-hidden="true"
+                ></span></label
+              ><label class="toggle-row"
+                ><span>多普勒增亮<small>盘面运动产生亮度差</small></span
+                ><input type="checkbox" id="doppler" checked /><span
+                  class="switch"
+                  aria-hidden="true"
+                ></span></label
+              ><label class="toggle-row"
+                ><span>显示吸积盘</span
+                ><input type="checkbox" id="disk" checked /><span
+                  class="switch"
+                  aria-hidden="true"
+                ></span
+              ></label>
+            </div>
+          </section>
+          <section class="model-note">
+            <span data-icon="info"></span>
+            <p>
+              交互式近似模型。光线弯曲实时计算；自旋用于吸积盘表现，并非完整
+              Kerr 时空解。
+            </p>
+          </section>
+          <div class="config-actions">
+            <button class="button secondary" id="export-config">
+              <span data-icon="download"></span>保存配置</button
+            ><button class="button secondary" id="import-config">
+              <span data-icon="upload"></span>载入配置</button
+            ><input
+              type="file"
+              id="config-file"
+              accept=".json,application/json"
+              hidden
+            />
+          </div>
+        </div>
+        <div class="panel-footer">
+          <span class="status-dot"></span
+          ><span id="renderer-label" title="GPU 渲染设备">等待渲染器</span
+          ><span>v1.0</span>
+        </div>
+      </aside>
+    </main>
+    <footer class="app-footer">
+      <span
+        >为探索而造 <span class="footer-star">✦</span> BUILT FOR CURIOSITY</span
+      ><span class="shortcuts"
+        ><kbd>SPACE</kbd> 暂停 <kbd>R</kbd> 重置 <kbd>H</kbd> 面板
+        <kbd>F</kbd> 全屏</span
+      ><span>光无法逃离，好奇心可以。</span>
+    </footer>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

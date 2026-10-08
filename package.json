@@ -1,0 +1,24 @@
+{
+  "name": "event-horizon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An interactive GPU-rendered black hole observatory built with WebGL 2.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/server.mjs",
+    "dev": "node scripts/server.mjs",
+    "preview": "node scripts/server.mjs --dist",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/server.test.mjs tests/params.test.mjs",
+    "check": "node --check scripts/server.mjs && node --check scripts/build.mjs && node --check src/main.js && node --check src/params.js && node --check src/renderer.js && node --check src/shaders.js && npm test && npm run build",
+    "test:gpu": "playwright test",
+    "capture": "node scripts/capture.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}
