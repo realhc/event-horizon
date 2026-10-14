@@ -186,6 +186,7 @@ uniform sampler2D uSource;
 uniform vec2 uTexel;
 uniform vec2 uDirection;
 uniform bool uThreshold;
+uniform float uSpread;
 vec3 sampleLight(vec2 uv) {
   vec3 c = texture(uSource, uv).rgb;
   if (uThreshold) {
@@ -195,7 +196,7 @@ vec3 sampleLight(vec2 uv) {
   return c;
 }
 void main() {
-  vec2 d = uDirection * uTexel * 1.45;
+  vec2 d = uDirection * uTexel * uSpread;
   vec3 c = sampleLight(vUv) * 0.227027;
   c += (sampleLight(vUv + d * 1.384615) + sampleLight(vUv - d * 1.384615)) * 0.316216;
   c += (sampleLight(vUv + d * 3.230769) + sampleLight(vUv - d * 3.230769)) * 0.070270;

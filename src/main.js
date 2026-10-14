@@ -1,4 +1,6 @@
 import { BlackHoleRenderer } from "./renderer.js";
+import { LiveHost } from "./live-host.js";
+import { createObservationControls, syncObservationUI } from "./observatory-ui.js";
 import {
   DEFAULTS,
   BOUNDS,
@@ -8,7 +10,9 @@ import {
   wrapAngle,
   parseConfig,
   encodeConfig,
-  physicalReadout,
+  SCENES,
+  sceneDefaults,
+  scenePatch,
 } from "./params.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -48,91 +52,27 @@ let toastTimer;
 let pointer = null;
 let currentPreset = "cinematic";
 let contextLost = false;
+let liveHost;
+let previousLiveFrame = -Infinity;
 
-const sliders = [
-  [
-    "massScale",
-    "质量尺度",
-    "physics-controls",
-    0.01,
-    (v) => `${(4.3 * v).toFixed(2)} ×10⁶ M☉`,
-  ],
-  ["spin", "自旋参数", "physics-controls", 0.01, (v) => `a* ${v.toFixed(2)}`],
-  [
-    "temperature",
-    "吸积盘温度",
-    "physics-controls",
-    100,
-    (v) => `${Math.round(v).toLocaleString("en-US")} K`,
-  ],
-  [
-    "diskOuter",
-    "吸积盘外半径",
-    "physics-controls",
-    0.1,
-    (v) => `${v.toFixed(1)} rₛ`,
-  ],
-  ["inclination", "观测倾角", "render-controls", 1, (v) => `${Math.round(v)}°`],
-  [
-    "distance",
-    "观测距离",
-    "render-controls",
-    0.1,
-    (v) => `${v.toFixed(1)} r_ref`,
-  ],
-  ["exposure", "曝光强度", "render-controls", 0.05, (v) => `${v.toFixed(2)}×`],
-  ["stars", "星空亮度", "render-controls", 0.05, (v) => `${v.toFixed(2)}×`],
-  ["speed", "时间流速", "render-controls", 0.05, (v) => `${v.toFixed(2)}×`],
-];
-for (const [key, label, container, step] of sliders) {
-  const [min, max] = BOUNDS[key];
-  const wrapper = document.createElement("div");
-  wrapper.className = "slider-control";
-  wrapper.innerHTML = `<div class="slider-label"><label for="${key}">${label}</label><output id="${key}-value" for="${key}"></output></div><input type="range" id="${key}" min="${min}" max="${max}" step="${step}" value="${params[key]}" />`;
-  $(`#${container}`).append(wrapper);
-  $(`#${key}`).addEventListener("input", (event) => {
-    params[key] = Number(event.target.value);
+createObservationControls({
+  onPatch: (patch) => {
+    params = { ...params, ...patch };
     currentPreset = null;
     dirty = true;
     syncUI();
-  });
-}
+  },
+});
 function syncUI() {
-  for (const [key, , , , format] of sliders) {
-    const input = $(`#${key}`);
-    input.value = params[key];
-    input.style.setProperty(
-      "--progress",
-      `${(100 * (params[key] - BOUNDS[key][0])) / (BOUNDS[key][1] - BOUNDS[key][0])}%`,
-    );
-    $(`#${key}-value`).textContent = format(params[key]);
-    input.setAttribute("aria-valuetext", format(params[key]));
-  }
+  syncObservationUI(params, currentPreset);
   for (const key of ["lensing", "doppler", "disk"])
     $(`#${key}`).checked = params[key];
   $("#quality").value = params.quality;
-  const physical = physicalReadout(params.massScale);
-  $("#mass-readout").innerHTML =
-    `${(physical.solarMasses / 1e6).toFixed(2)} <small>×10⁶ M☉</small>`;
-  $("#radius-readout").innerHTML =
-    `${(physical.schwarzschildKm / 1e6).toFixed(2)} <small>百万 km</small>`;
-  $("#angle-readout").innerHTML =
-    `${Math.round(params.inclination)} <small>deg</small>`;
-  document.querySelectorAll("[data-preset]").forEach((button) => {
-    const active = button.dataset.preset === currentPreset;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-  $("#scene-label").textContent =
-    {
-      cinematic: "CINEMATIC VIEW",
-      faceOn: "POLAR VIEW",
-      blue: "HIGH ENERGY VIEW",
-    }[currentPreset] || "CUSTOM OBSERVATION";
   $("#pause").innerHTML = icon(paused ? "play" : "pause");
   $("#pause").setAttribute("aria-label", paused ? "继续动画" : "暂停动画");
   $("#pause").setAttribute("aria-pressed", String(paused));
   if (paused) $("#fps").textContent = "PAUSED";
+  liveHost?.publishState();
 }
 function toast(message) {
   clearTimeout(toastTimer);
@@ -157,6 +97,7 @@ function resize() {
   dirty = true;
 }
 function fail(error) {
+  if (liveHost?.active) liveHost.stop();
   $("#error-state").hidden = false;
   $("#error-message").textContent =
     `${error.message || error} 请使用支持 WebGL2 的浏览器，并检查浏览器硬件加速设置。`;
@@ -198,10 +139,25 @@ function initialize() {
 function loop(now) {
   const dt = Math.min((now - previousTime) / 1000, 0.05);
   previousTime = now;
-  if (renderer && !contextLost && !document.hidden && (!paused || dirty)) {
-    if (!paused) simTime += dt * params.speed;
+  if (
+    renderer &&
+    !contextLost &&
+    (!document.hidden || liveHost?.active) &&
+    !paused
+  )
+    simTime += dt * params.speed;
+  const liveFrameDue =
+    !liveHost?.active || now - previousLiveFrame >= 1000 / (liveHost.fps * 2);
+  if (
+    renderer &&
+    !contextLost &&
+    (!document.hidden || liveHost?.active) &&
+    (!paused || dirty) &&
+    (dirty || liveFrameDue)
+  ) {
     try {
       renderer.render(simTime, params);
+      previousLiveFrame = now;
       dirty = false;
       frameCount++;
     } catch (error) {
@@ -220,7 +176,9 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 function applyPreset(key) {
-  params = { ...PRESETS[key] };
+  const preset = PRESETS[key];
+  if (!preset) return;
+  params = { ...params, ...scenePatch(preset.scene, preset) };
   currentPreset = key;
   dirty = true;
   syncUI();
@@ -234,9 +192,10 @@ function togglePause() {
   syncUI();
 }
 function resetCamera() {
-  params.inclination = DEFAULTS.inclination;
-  params.yaw = DEFAULTS.yaw;
-  params.distance = DEFAULTS.distance;
+  const defaults = sceneDefaults(params.scene);
+  params.inclination = defaults.inclination;
+  params.yaw = defaults.yaw;
+  params.distance = defaults.distance;
   currentPreset = null;
   dirty = true;
   syncUI();
@@ -320,6 +279,9 @@ $("#quality").addEventListener("change", (event) => {
   syncUI();
   resize();
 });
+$("#scene").addEventListener("change", (event) => {
+  applyPreset(SCENES[event.target.value].defaultPreset);
+});
 document
   .querySelectorAll("[data-preset]")
   .forEach((button) =>
@@ -328,7 +290,7 @@ document
 $("#pause").addEventListener("click", togglePause);
 $("#reset-camera").addEventListener("click", resetCamera);
 $("#reset-all").addEventListener("click", () => {
-  applyPreset("cinematic");
+  applyPreset(SCENES[params.scene].defaultPreset);
   toast("已恢复默认观测参数");
 });
 $("#hide-panel").addEventListener("click", togglePanel);
@@ -397,7 +359,7 @@ document.addEventListener("keydown", (event) => {
     togglePause();
   }
   if (event.code === "KeyR") {
-    applyPreset("cinematic");
+    applyPreset(SCENES[params.scene].defaultPreset);
     toast("已恢复默认观测参数");
   }
   if (event.code === "KeyH") togglePanel();
@@ -417,11 +379,38 @@ document.addEventListener("visibilitychange", () => {
   previousTime = performance.now();
   dirty = true;
 });
-window.addEventListener("pagehide", () => renderer?.dispose());
+window.addEventListener("pagehide", () => {
+  liveHost?.dispose();
+  renderer?.dispose();
+});
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) initialize();
 });
 new ResizeObserver(resize).observe($("#viewport"));
 syncUI();
 initialize();
+liveHost = new LiveHost(canvas, {
+  ready: () => Boolean(renderer && !contextLost),
+  getState: () => ({
+    parameters: { ...params },
+    paused,
+    preset: currentPreset,
+  }),
+  applyPatch: (patch) => {
+    const previousQuality = params.quality;
+    const defaults = patch.scene && patch.scene !== params.scene ? scenePatch(patch.scene) : {};
+    params = { ...params, ...defaults, ...patch };
+    currentPreset = null;
+    dirty = true;
+    syncUI();
+    if (params.quality !== previousQuality) resize();
+  },
+  applyPreset,
+  setPaused: (next) => {
+    if (paused !== next) togglePause();
+  },
+  resetCamera,
+  toast,
+  download,
+});
 requestAnimationFrame(loop);

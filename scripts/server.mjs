@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { attachSignaling } from "./signaling.mjs";
 
 const projectDirectory = fileURLToPath(new URL("../", import.meta.url));
 const mimeTypes = {
@@ -49,7 +50,7 @@ function respond(request, response, status, message) {
 /** Create a static HTTP server without opening a port; useful for tests and embedding. */
 export async function createStaticServer({ rootDir = projectDirectory } = {}) {
   const root = await realpath(rootDir);
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.setHeader("Allow", "GET, HEAD");
       respond(request, response, 405, "Method not allowed");
@@ -65,11 +66,39 @@ export async function createStaticServer({ rootDir = projectDirectory } = {}) {
       respond(request, response, 400, "Invalid request path");
       return;
     }
+    if (decoded === "/api/health") {
+      const body = JSON.stringify({
+        service: "event-horizon",
+        signaling: true,
+      });
+      response.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": Buffer.byteLength(body),
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-cache",
+      });
+      response.end(request.method === "HEAD" ? undefined : body);
+      return;
+    }
     const segments = decoded.split("/").filter(Boolean);
+    if (
+      [
+        "scripts",
+        "tests",
+        "node_modules",
+        "package.json",
+        "package-lock.json",
+      ].includes(segments[0]?.toLowerCase())
+    ) {
+      respond(request, response, 403, "Forbidden");
+      return;
+    }
     if (
       decoded.includes("\\") ||
       decoded.includes("\0") ||
-      segments.some((segment) => segment.startsWith("."))
+      segments.some(
+        (segment) => segment.startsWith(".") || segment.includes(":"),
+      )
     ) {
       respond(request, response, 403, "Forbidden");
       return;
@@ -124,6 +153,8 @@ export async function createStaticServer({ rootDir = projectDirectory } = {}) {
       }
     }
   });
+  attachSignaling(server);
+  return server;
 }
 
 function parseOptions(args) {

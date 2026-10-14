@@ -4,12 +4,15 @@ import {
   bloomFragment,
   compositeFragment,
 } from "./shaders.js";
+import { celestialFragment } from "./celestial-shaders.js";
 
 const QUALITY = {
   performance: { steps: 100, step: 0.073 },
   balanced: { steps: 170, step: 0.045 },
   ultra: { steps: 240, step: 0.032 },
 };
+const VOLUME_STEPS = { performance: 40, balanced: 64, ultra: 104 };
+const CELESTIAL_SCENES = { nebula: 1, galaxy: 2, planet: 3, star: 4 };
 const SOFTWARE_GPU =
   /swiftshader|llvmpipe|softpipe|software|microsoft basic render|warp/i;
 const KNOWN_GPU =
@@ -61,6 +64,7 @@ export class BlackHoleRenderer {
     this.programs = [];
     try {
       this.scene = this.createProgram(sceneFragment);
+      this.celestial = this.createProgram(celestialFragment);
       this.bloom = this.createProgram(bloomFragment);
       this.composite = this.createProgram(compositeFragment);
       this.vao = gl.createVertexArray();
@@ -238,35 +242,63 @@ export class BlackHoleRenderer {
     if (this.contextLost || gl.isContextLost())
       throw new Error("WebGL 上下文已丢失，请重新加载页面恢复渲染。");
     const quality = QUALITY[params.quality] || QUALITY.balanced;
+    const celestialMode = CELESTIAL_SCENES[params.scene] || 0;
+    const sceneProgram = celestialMode ? this.celestial : this.scene;
     const [sceneTarget, bloomX, bloomY] = this.targets;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, sceneTarget.framebuffer);
     gl.viewport(0, 0, sceneTarget.width, sceneTarget.height);
-    gl.useProgram(this.scene.program);
-    const u = this.scene.uniforms;
+    gl.useProgram(sceneProgram.program);
+    const u = sceneProgram.uniforms;
     gl.uniform2f(u.uResolution, sceneTarget.width, sceneTarget.height);
     gl.uniform1f(
       u.uTime,
-      Number.isFinite(timeSeconds) ? timeSeconds / params.massScale : 0,
+      Number.isFinite(timeSeconds)
+        ? timeSeconds / (celestialMode ? 1 : params.massScale)
+        : 0,
     );
-    gl.uniform1f(u.uMass, params.massScale);
-    gl.uniform1f(u.uSpin, params.spin);
     gl.uniform1f(u.uInclination, params.inclination);
     gl.uniform1f(u.uYaw, params.yaw);
     gl.uniform1f(u.uDistance, params.distance);
     gl.uniform1f(u.uTemperature, params.temperature);
-    gl.uniform1f(u.uOuter, params.diskOuter);
     gl.uniform1f(u.uStars, params.stars);
-    gl.uniform1i(u.uLensing, params.lensing ? 1 : 0);
-    gl.uniform1i(u.uDoppler, params.doppler ? 1 : 0);
-    gl.uniform1i(u.uDisk, params.disk ? 1 : 0);
-    gl.uniform1i(u.uSteps, quality.steps);
-    gl.uniform1f(u.uStepSize, quality.step);
+    if (celestialMode) {
+      gl.uniform1i(u.uScene, celestialMode);
+      gl.uniform1i(u.uSteps, VOLUME_STEPS[params.quality] || VOLUME_STEPS.balanced);
+      const celestialValues = {
+        uNebulaDensity: params.nebulaDensity ?? 1.1,
+        uNebulaHue: params.nebulaHue ?? 280,
+        uNebulaTurbulence: params.nebulaTurbulence ?? 1,
+        uGalaxyArms: params.galaxyArms ?? 4,
+        uGalaxyPitch: params.galaxyPitch ?? 0.4,
+        uGalaxyDust: params.galaxyDust ?? 0.8,
+        uPlanetRadius: params.planetRadius ?? 1,
+        uRingTilt: params.ringTilt ?? 25,
+        uRingWidth: params.ringWidth ?? 2.2,
+        uPlanetBands: params.planetBands ?? 8,
+        uStarActivity: params.starActivity ?? 0.8,
+        uStarCorona: params.starCorona ?? 1,
+      };
+      for (const [name, value] of Object.entries(celestialValues))
+        gl.uniform1f(u[name], value);
+    } else {
+      gl.uniform1f(u.uMass, params.massScale);
+      gl.uniform1f(u.uSpin, params.spin);
+      gl.uniform1f(u.uOuter, params.diskOuter);
+      gl.uniform1i(u.uLensing, params.lensing ? 1 : 0);
+      gl.uniform1i(u.uDoppler, params.doppler ? 1 : 0);
+      gl.uniform1i(u.uDisk, params.disk ? 1 : 0);
+      gl.uniform1i(u.uSteps, quality.steps);
+      gl.uniform1f(u.uStepSize, quality.step);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     gl.useProgram(this.bloom.program);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(this.bloom.uniforms.uSource, 0);
+    // A compact kernel keeps pin-point stars from appearing as separated ghosts.
+    // Preserve the wider footprint of the original black-hole accretion glow.
+    gl.uniform1f(this.bloom.uniforms.uSpread, celestialMode ? 0.65 : 1.45);
     gl.bindFramebuffer(gl.FRAMEBUFFER, bloomX.framebuffer);
     gl.viewport(0, 0, bloomX.width, bloomX.height);
     gl.bindTexture(gl.TEXTURE_2D, sceneTarget.texture);

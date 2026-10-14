@@ -2,7 +2,7 @@
   "name": "event-horizon",
   "version": "1.0.0",
   "private": true,
-  "description": "An interactive GPU-rendered black hole observatory built with WebGL 2.",
+  "description": "An interactive GPU-rendered celestial observatory with WebGL 2 and WebRTC live control.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -13,12 +13,18 @@
     "dev": "node scripts/server.mjs",
     "preview": "node scripts/server.mjs --dist",
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/server.test.mjs tests/params.test.mjs",
-    "check": "node --check scripts/server.mjs && node --check scripts/build.mjs && node --check src/main.js && node --check src/params.js && node --check src/renderer.js && node --check src/shaders.js && npm test && npm run build",
+    "test": "node --test tests/server.test.mjs tests/params.test.mjs tests/signaling.test.mjs tests/live-control.test.mjs tests/stream-stats.test.mjs",
+    "check": "node scripts/check.mjs",
     "test:gpu": "playwright test",
-    "capture": "node scripts/capture.mjs"
+    "capture": "node scripts/capture.mjs",
+    "capture:celestial": "node scripts/capture-celestial.mjs",
+    "demo:live": "node scripts/live-demo.mjs",
+    "test:live": "node scripts/live-demo.mjs --headless --verify"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
   }
 }

@@ -29,6 +29,11 @@ export async function buildProject(projectDir = projectDirectory) {
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
   await cp(path.join(root, "index.html"), path.join(output, "index.html"));
+  try {
+    await cp(path.join(root, "viewer.html"), path.join(output, "viewer.html"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   await cp(path.join(root, "src"), path.join(output, "src"), {
     recursive: true,
   });

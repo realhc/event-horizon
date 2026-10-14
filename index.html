@@ -9,20 +9,21 @@
     <meta name="theme-color" content="#0b0c0e" />
     <meta
       name="description"
-      content="Event Horizon — 支持 GPU 实时光线弯曲与可调参数的黑洞观测台。"
+      content="Event Horizon — 支持 GPU 实时光线弯曲与可调参数的天体观测台。"
     />
-    <title>Event Horizon · 黑洞观测台</title>
+    <title>Event Horizon · 天体观测台</title>
     <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
     <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/live.css" />
   </head>
   <body>
     <header class="app-header">
       <a class="brand" href="./" aria-label="Event Horizon 首页"
         ><span class="brand-orbit" aria-hidden="true"></span
-        ><span>EVENT HORIZON<small>交互式黑洞观测台</small></span></a
+        ><span>EVENT HORIZON<small>交互式天体观测台</small></span></a
       >
       <div class="header-middle">
-        <span class="header-divider"></span><span>OBSERVATORY / 01</span>
+        <span class="header-divider"></span><span>GPU HOST / WEBRTC LIVE</span>
       </div>
       <div class="header-actions">
         <span class="gpu-badge" id="gpu-badge"
@@ -37,7 +38,7 @@
       </div>
     </header>
     <main class="workspace">
-      <section class="viewport" id="viewport" aria-label="实时黑洞可视化">
+      <section class="viewport" id="viewport" aria-label="实时天体可视化">
         <canvas
           id="universe"
           aria-label="GPU 渲染的黑洞，可拖动旋转视角，滚轮缩放"
@@ -48,8 +49,8 @@
             <span class="live-dot"></span>实时光线追踪
             <span class="slash">/</span> WEBGL 2.0
           </div>
-          <h1>凝视<span>事件视界。</span></h1>
-          <p>在光与引力的边界，探索不可见之物。</p>
+          <h1 id="scene-title">凝视<span>事件视界。</span></h1>
+          <p id="scene-description">在光与引力的边界，探索不可见之物。</p>
         </div>
         <div class="viewport-top-right">
           <span id="scene-label">CINEMATIC VIEW</span
@@ -68,7 +69,7 @@
         <div class="viewport-bottom">
           <div class="scene-caption">
             <span class="caption-line"></span
-            ><span>吸积盘 · 引力透镜 · 相对论性增亮</span>
+            ><span id="scene-caption">吸积盘 · 引力透镜 · 相对论性增亮</span>
           </div>
           <div class="readouts">
             <div>
@@ -130,7 +131,7 @@
       <aside
         class="control-panel"
         id="control-panel"
-        aria-label="黑洞参数控制面板"
+        aria-label="天体参数控制面板"
       >
         <div class="panel-heading">
           <div>
@@ -147,12 +148,18 @@
           </button>
         </div>
         <div class="panel-scroll">
+          <section class="scene-selector" aria-labelledby="scene-selector-heading">
+            <div class="section-label"><span>✦</span><h3 id="scene-selector-heading">探索天体</h3></div>
+            <label class="scene-select-label" for="scene">观测模式</label>
+            <select id="scene" aria-label="选择观测天体"></select>
+            <p>选择天体，调整参数，探索不同宇宙景观。</p>
+          </section>
           <section class="parameter-section preset-section">
             <div class="section-label">
               <span>01</span>
               <h3>场景预设</h3>
             </div>
-            <div class="presets">
+            <div class="presets" id="scene-presets">
               <button
                 class="preset active"
                 data-preset="cinematic"
@@ -169,7 +176,7 @@
           <section class="parameter-section">
             <div class="section-label">
               <span>02</span>
-              <h3>黑洞与吸积盘</h3>
+              <h3 id="scene-controls-title">黑洞与吸积盘</h3>
             </div>
             <div id="physics-controls"></div>
           </section>
@@ -187,7 +194,7 @@
                 <option value="ultra">精细 · 高负载</option>
               </select>
             </div>
-            <div class="toggle-list">
+            <div class="toggle-list" data-scene-only="blackHole">
               <label class="toggle-row"
                 ><span>引力透镜<small>光线受引力弯曲</small></span
                 ><input type="checkbox" id="lensing" checked /><span
@@ -211,7 +218,7 @@
           </section>
           <section class="model-note">
             <span data-icon="info"></span>
-            <p>
+            <p id="model-note">
               交互式近似模型。光线弯曲实时计算；自旋用于吸积盘表现，并非完整
               Kerr 时空解。
             </p>
@@ -228,6 +235,111 @@
               hidden
             />
           </div>
+          <section
+            class="live-card"
+            id="live-section"
+            aria-label="直播主机控制"
+          >
+            <div class="section-label">
+              <span>LIVE</span>
+              <h3>实时渲染与交互直播</h3>
+            </div>
+            <output
+              class="live-status"
+              id="host-connection-state"
+              data-state="idle"
+              >未开始直播</output
+            >
+            <div class="live-room-line">
+              <span>房间号</span><strong id="host-room">—</strong
+              ><span>观众 <b id="live-peer-count">0</b></span>
+            </div>
+            <div class="live-actions">
+              <button class="button" id="start-live">开始直播</button
+              ><button class="button secondary" id="stop-live" disabled>
+                结束直播
+              </button>
+            </div>
+            <div class="live-actions">
+              <a
+                class="button secondary"
+                id="viewer-link"
+                href="./viewer.html"
+                target="_blank"
+                rel="noopener"
+                >打开观众页</a
+              ><button class="button secondary" id="copy-viewer-link" disabled>
+                复制链接
+              </button>
+            </div>
+            <div class="live-field">
+              <label for="stream-size">输出分辨率</label
+              ><select id="stream-size">
+                <option value="1280x720">720p · 1280×720</option>
+                <option value="1920x1080">1080p · 1920×1080</option>
+              </select>
+            </div>
+            <div class="live-field">
+              <label for="stream-fps">采集帧率</label
+              ><select id="stream-fps">
+                <option value="30">30 FPS</option>
+                <option value="60">60 FPS</option>
+              </select>
+            </div>
+            <div class="live-field">
+              <label for="stream-bitrate">目标码率上限</label
+              ><select id="stream-bitrate">
+                <option value="2">2 Mbps</option>
+                <option value="6" selected>6 Mbps</option>
+                <option value="12">12 Mbps</option>
+              </select>
+            </div>
+            <p class="live-note" id="capture-size">1280 × 720 / 30 FPS</p>
+            <div class="live-permission">
+              <span id="controller-name">仅主机控制</span
+              ><button class="button secondary" id="revoke-control" disabled>
+                收回控制权
+              </button>
+            </div>
+            <div id="control-request" class="live-request" hidden>
+              <strong id="request-peer"></strong>
+              <div class="live-actions">
+                <button class="button" id="grant-control">允许控制</button
+                ><button class="button secondary" id="deny-control">
+                  拒绝
+                </button>
+              </div>
+            </div>
+            <div class="live-stat-grid">
+              <div>
+                <span>发送码率</span><output data-host-stat="bitrate">—</output>
+              </div>
+              <div>
+                <span>编码帧率</span><output data-host-stat="fps">—</output>
+              </div>
+              <div>
+                <span>丢包率</span><output data-host-stat="loss">—</output>
+              </div>
+              <div>
+                <span>网络 RTT</span><output data-host-stat="rtt">—</output>
+              </div>
+              <div>
+                <span>视频尺寸</span
+                ><output data-host-stat="resolution">—</output>
+              </div>
+              <div>
+                <span>编码格式</span><output data-host-stat="codec">—</output>
+              </div>
+            </div>
+            <p class="live-note" id="encoder-info">等待编码器统计</p>
+            <button class="button secondary" id="export-stats" disabled>
+              导出实验统计 CSV
+            </button>
+            <p class="live-note">
+              RTT 是网络往返时间；码率为实际测量。视频通过 WebRTC
+              传输，调参通过数据通道传输。
+            </p>
+          </section>
         </div>
         <div class="panel-footer">
           <span class="status-dot"></span

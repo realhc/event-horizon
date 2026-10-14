@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta
+      name="description"
+      content="Event Horizon WebRTC 观众端：观看实时天体视频，申请参数控制并查看实际网络指标。"
+    />
+    <title>Event Horizon · 实时观众席</title>
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/live.css" />
+  </head>
+  <body class="live-viewer">
+    <header class="app-header">
+      <a class="brand" href="./"
+        ><span class="brand-orbit" aria-hidden="true"></span
+        ><span>EVENT HORIZON<small>实时天体 · 观众席</small></span></a
+      >
+      <div class="header-middle">
+        <span class="header-divider"></span
+        ><span>LIVE OBSERVATORY / DOWNLINK</span>
+      </div>
+      <div class="header-actions">
+        <span class="live-role-badge"><i></i>REMOTE VIDEO</span
+        ><a class="button secondary" href="./">打开主持端 ↗</a>
+      </div>
+    </header>
+    <main class="workspace">
+      <section
+        class="viewport live-video-stage"
+        id="viewer-stage"
+        aria-label="主持端实时天体视频"
+      >
+        <video
+          id="remote-video"
+          autoplay
+          muted
+          playsinline
+          tabindex="0"
+          aria-label="主持端发送的黑洞画面，授权后可拖动旋转与滚轮缩放"
+        ></video>
+        <div class="live-video-shade" aria-hidden="true"></div>
+        <div class="viewport-title">
+          <div class="eyebrow">
+            <span class="live-dot"></span>来自主持端的实时画面
+            <span class="slash">/</span> WEBRTC
+          </div>
+          <h1 id="viewer-scene-title">共享同一片<span>视界。</span></h1>
+          <p id="viewer-scene-description">一端渲染，另一端共同探索。</p>
+        </div>
+        <div class="viewport-top-right">
+          <span id="viewer-scene">WAITING FOR SIGNAL</span
+          ><span class="crosshair-mark">+</span>
+        </div>
+        <div class="canvas-corner corner-tl"></div>
+        <div class="canvas-corner corner-tr"></div>
+        <div class="canvas-corner corner-bl"></div>
+        <div class="canvas-corner corner-br"></div>
+        <div class="live-empty" id="video-placeholder">
+          <div class="live-empty-orbit" aria-hidden="true"><span></span></div>
+          <span class="eyebrow">AWAITING DOWNLINK</span>
+          <h2 id="placeholder-title">等待观测信号</h2>
+          <p id="placeholder-message">
+            在右侧输入主持端房间码，连接实时天体画面。
+          </p>
+        </div>
+        <button class="button live-play-button" id="play-video" hidden>
+          点击播放实时画面
+        </button>
+        <div class="viewport-bottom">
+          <div class="scene-caption">
+            <span class="caption-line"></span
+            ><span id="video-caption">主持端 GPU 渲染 · 观众端视频播放</span>
+          </div>
+          <div class="readouts">
+            <div>
+              <span>黑洞质量</span
+              ><strong id="viewer-mass-readout"
+                >4.30 <small>×10⁶ M☉</small></strong
+              >
+            </div>
+            <div>
+              <span>史瓦西半径</span
+              ><strong id="viewer-radius-readout"
+                >12.70 <small>百万 km</small></strong
+              >
+            </div>
+            <div>
+              <span>观测倾角</span
+              ><strong id="viewer-angle-readout">82 <small>deg</small></strong>
+            </div>
+          </div>
+          <div class="viewport-toolbar">
+            <div class="gesture-hint">
+              <span id="viewer-gesture">观看模式 · 申请控制后可拖动旋转</span>
+            </div>
+            <div class="toolbar-buttons">
+              <button
+                class="icon-button"
+                id="viewer-pause"
+                data-remote-control
+                disabled
+                aria-label="暂停主持端动画"
+                title="暂停 / 继续主持端动画"
+              >
+                <svg viewBox="0 0 18 18" aria-hidden="true">
+                  <path d="M6 3v12M12 3v12" />
+                </svg></button
+              ><button
+                class="icon-button"
+                id="viewer-reset-camera"
+                data-remote-control
+                disabled
+                aria-label="重置主持端视角"
+                title="重置视角"
+              >
+                <svg viewBox="0 0 18 18" aria-hidden="true">
+                  <circle cx="9" cy="9" r="3" />
+                  <ellipse
+                    cx="9"
+                    cy="9"
+                    rx="8"
+                    ry="4"
+                    transform="rotate(-30 9 9)"
+                  />
+                </svg></button
+              ><button
+                class="icon-button"
+                id="viewer-fullscreen"
+                aria-label="全屏播放"
+                title="全屏播放"
+              >
+                <svg viewBox="0 0 18 18" aria-hidden="true">
+                  <path d="M6 2H2v4m10-4h4v4M2 12v4h4m10-4v4h-4" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="control-panel" aria-label="观众连接与远程参数">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">REMOTE MISSION CONTROL</span>
+            <h2>实时观众席</h2>
+          </div>
+          <span class="live-permission-badge" id="control-badge">只读</span>
+        </div>
+        <div class="panel-scroll">
+          <section class="scene-selector" aria-labelledby="viewer-selector-heading">
+            <div class="section-label"><span>✦</span><h3 id="viewer-selector-heading">共享天体观测</h3></div>
+            <label class="scene-select-label" for="viewer-scene-mode">主持端天体模式</label>
+            <select id="viewer-scene-mode" data-remote-control disabled aria-label="选择主持端观测天体"></select>
+            <p>获授权后，可切换天体并控制对应参数。</p>
+          </section>
+          <section
+            class="live-card live-connect-card"
+            aria-labelledby="connection-heading"
+          >
+            <div class="live-card-heading">
+              <h3 id="connection-heading">连接主持端</h3>
+              <span class="live-small-label">01 / LINK</span>
+            </div>
+            <form id="join-form">
+              <label class="live-field" for="room-code"
+                ><span>房间码</span
+                ><input
+                  id="room-code"
+                  name="room"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  spellcheck="false"
+                  maxlength="64"
+                  placeholder="输入房间码"
+                  required
+              /></label>
+              <div class="live-actions">
+                <button class="button" id="join-room" type="submit">
+                  连接房间</button
+                ><button
+                  class="button secondary"
+                  id="leave-room"
+                  type="button"
+                  disabled
+                >
+                  离开
+                </button>
+              </div>
+            </form>
+            <div class="live-status" id="connection-status" data-state="idle">
+              <i aria-hidden="true"></i
+              ><output id="connection-state" aria-live="polite"
+                >尚未连接</output
+              >
+            </div>
+            <p class="live-message" id="connection-message">
+              主持端创建房间后，将房间码分享给观众。
+            </p>
+            <div class="live-control-request">
+              <button class="button secondary" id="request-control" disabled>
+                申请参数控制</button
+              ><button class="button secondary" id="release-control" hidden>
+                交还控制
+              </button>
+              <p id="control-message" class="live-message" aria-live="polite">
+                观看无需控制权限，参数调整需主持端授权。
+              </p>
+            </div>
+          </section>
+          <section class="parameter-section">
+            <div class="section-label">
+              <span>02</span>
+              <h3>远程场景预设</h3>
+            </div>
+            <div class="presets" id="viewer-presets">
+              <button
+                class="preset"
+                data-live-preset="cinematic"
+                data-remote-control
+                disabled
+                aria-pressed="false"
+              >
+                <span class="preset-orbit edge"></span>电影感</button
+              ><button
+                class="preset"
+                data-live-preset="faceOn"
+                data-remote-control
+                disabled
+                aria-pressed="false"
+              >
+                <span class="preset-orbit top"></span>俯视</button
+              ><button
+                class="preset"
+                data-live-preset="blue"
+                data-remote-control
+                disabled
+                aria-pressed="false"
+              >
+                <span class="preset-orbit blue"></span>高温
+              </button>
+            </div>
+          </section>
+          <section class="parameter-section">
+            <div class="section-label">
+              <span>03</span>
+              <h3 id="viewer-controls-title">主持端观测参数</h3>
+            </div>
+            <div id="viewer-parameter-controls"></div>
+            <div class="select-row">
+              <label for="viewer-quality">主持端渲染质量</label
+              ><select id="viewer-quality" data-remote-control disabled>
+                <option value="performance">流畅 · 低负载</option>
+                <option value="balanced">均衡 · 推荐</option>
+                <option value="ultra">精细 · 高负载</option>
+              </select>
+            </div>
+            <div class="toggle-list" data-scene-only="blackHole">
+              <label class="toggle-row"
+                ><span>引力透镜</span
+                ><input
+                  type="checkbox"
+                  id="viewer-lensing"
+                  data-remote-control
+                  disabled /><span
+                  class="switch"
+                  aria-hidden="true"
+                ></span></label
+              ><label class="toggle-row"
+                ><span>多普勒增亮</span
+                ><input
+                  type="checkbox"
+                  id="viewer-doppler"
+                  data-remote-control
+                  disabled /><span
+                  class="switch"
+                  aria-hidden="true"
+                ></span></label
+              ><label class="toggle-row"
+                ><span>显示吸积盘</span
+                ><input
+                  type="checkbox"
+                  id="viewer-disk"
+                  data-remote-control
+                  disabled /><span class="switch" aria-hidden="true"></span
+              ></label>
+            </div>
+          </section>
+          <section class="model-note">
+            <p id="viewer-model-note">
+              主持端计算天体画面，观众端只接收并播放视频。这里显示主持端确认后的参数；获授权的操作通过数据通道发送。
+            </p>
+          </section>
+          <section
+            class="live-card live-telemetry"
+            aria-labelledby="telemetry-heading"
+          >
+            <div class="live-card-heading">
+              <h3 id="telemetry-heading">实际传输指标</h3>
+              <span class="live-small-label">RTC STATS</span>
+            </div>
+            <dl class="live-stat-grid">
+              <div>
+                <dt>接收码率</dt>
+                <dd data-stat="bitrate">— <small>kbps</small></dd>
+              </div>
+              <div>
+                <dt>解码帧率</dt>
+                <dd data-stat="fps">— <small>fps</small></dd>
+              </div>
+              <div>
+                <dt>丢包率</dt>
+                <dd data-stat="loss">— <small>%</small></dd>
+              </div>
+              <div>
+                <dt>网络 RTT</dt>
+                <dd data-stat="rtt">— <small>ms</small></dd>
+              </div>
+              <div>
+                <dt>视频分辨率</dt>
+                <dd data-stat="resolution">—</dd>
+              </div>
+              <div>
+                <dt>视频编解码</dt>
+                <dd data-stat="codec">—</dd>
+              </div>
+            </dl>
+            <p class="live-metric-note">
+              来自 RTCPeerConnection.getStats()。网络 RTT 不代表完整画面延迟。
+            </p>
+            <p class="live-decoder" id="decoder-info">解码器信息：等待连接</p>
+          </section>
+        </div>
+        <div class="panel-footer">
+          <span class="status-dot"></span
+          ><span id="viewer-role-status">VIDEO RECEIVER · READ ONLY</span
+          ><span>LIVE</span>
+        </div>
+      </aside>
+    </main>
+    <footer class="app-footer">
+      <span>同一片视界 <span class="footer-star">✦</span> SHARED CURIOSITY</span
+      ><span>WebRTC 视频 · 参数数据通道 · 主持端授权</span
+      ><span>观众端无需天体着色器</span>
+    </footer>
+    <script type="module" src="./src/viewer.js"></script>
+  </body>
+</html>

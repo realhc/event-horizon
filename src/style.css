@@ -991,3 +991,24 @@ kbd {
     transition: none !important;
   }
 }
+
+/* Celestial observatory modes */
+body[data-scene="nebula"] { --accent: #b9a0ee; }
+body[data-scene="galaxy"] { --accent: #93b9ef; }
+body[data-scene="planet"] { --accent: #c8c198; }
+body[data-scene="star"] { --accent: #f4b677; }
+.scene-selector { padding: 20px 0 19px; border-bottom: 1px solid var(--line); }
+.scene-selector .section-label { margin-bottom: 15px; }
+.scene-select-label { display: block; color: #a8a1ad; font-size: 10px; margin-bottom: 8px; }
+.scene-selector select { width: 100%; max-width: none; padding: 11px 10px; border: 1px solid #4c4357; border-radius: 6px; background: #19171f; color: var(--text); font-size: 11px; }
+.scene-selector p { color: #85808c; font-size: 9px; line-height: 1.7; margin: 11px 0 0; }
+.presets { grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); }
+.preset-orbit.scene-nebula { border-color: #b9a0ee; box-shadow: 0 0 8px #ac86df66; background: #74559466; }
+.preset-orbit.scene-galaxy { border-color: #93b9ef; transform: rotate(-30deg) scaleY(0.6); }
+.preset-orbit.scene-planet { border-color: #c8c198; background: #9f8c5966; }
+.preset-orbit.scene-star { border-color: #f4b677; background: #f4b67788; box-shadow: 0 0 7px #f4b67755; }
+.viewport-title h1 span, .slider-label output { color: var(--accent); }
+.slider-control input[type="range"]::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--progress, 50%), #323238 var(--progress, 50%)); }
+.slider-control input[type="range"]::-webkit-slider-thumb { background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.slider-control input[type="range"]::-moz-range-progress,
+.slider-control input[type="range"]::-moz-range-thumb { background: var(--accent); }
